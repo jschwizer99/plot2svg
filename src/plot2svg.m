@@ -13,7 +13,7 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %
 %  Juerg Schwizer 23-Oct-2005
 %  See http://www.zhinst.com/blogs/schwizer/ to get more informations
-%
+
 %  07.06.2005 - Bugfix axxindex (Index exceeds matrix dimensions)
 %  19.09.2005 - Added possibility to select output format of pixel graphics
 %  23.10.2005 - Bugfix cell array strings (added by Bill)
@@ -104,10 +104,14 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %             - Fix for another axis label problem (thanks to Ben Mitch)
 %  15-09-2012 - Fix for linestyle none of rectangles (thanks to Andrew)
 %             - Enabled scatter plot functionality
+%  16-02-2013 - Fix for manual tick labels if count differs from
+%               number of ticks (thanks to Anna)
+%  18-07-2013 - Small fix to exclude change log from help
+%               (thanks to Stuart Layton)
 
 global PLOT2SVG_globals
 global colorname
-progversion='15-Sep-2012';
+progversion='16-Feb-2013';
 PLOT2SVG_globals.runningIdNumber = 0;
 PLOT2SVG_globals.octave = false;
 PLOT2SVG_globals.checkUserData = true;
@@ -1059,6 +1063,10 @@ if strcmp(get(ax,'Visible'),'on')
 end
 fprintf(fid,'    <g>\n');
 axchild=get(ax,'Children');
+if ~verLessThan('matlab','8.4.0')
+    % Matlab h2 engine
+    axchild = [axchild; ax.Title; ax.XLabel; ax.YLabel; ax.ZLabel];
+end
 group = axchild2svg(fid,id,axIdString,ax,group,paperpos,axchild,axpos,groupax,projection,boundingBoxAxes);
 fprintf(fid,'    </g>\n');
 if strcmp(get(ax,'Visible'),'on')
@@ -1189,6 +1197,9 @@ if strcmp(get(ax,'Visible'),'on')
                 % Note: 3D plot do not support the property XAxisLocation
                 % setting 'top'.
                 [angle, align] = improvedXLabel(ax, 0, 'Center');
+                if (strcmp(get(ax,'XTickLabelMode'),'manual'))
+                    axlabelx = axlabelx(axxindex,:);
+                end
                 if strcmp(get(ax,'XAxisLocation'),'top') && (projection.xyplane == true)
                     for i = 1:length(axxindex)
                         label2svg(fid,grouplabel,axpos,ax,xg_label_end(i),yg_label_end(i),convertString(axlabelx(i,:)),align,angle,'bottom',1,paperpos,scolorname,exponent);
@@ -1246,6 +1257,9 @@ if strcmp(get(ax,'Visible'),'on')
                 end
                 % Note: 3D plot do not support the property YAxisLocation
                 % setting 'right'.
+                if (strcmp(get(ax,'YTickLabelMode'),'manual'))
+                    axlabely = axlabely(axyindex,:);
+                end
                 if (projection.xyplane == true)
                     if strcmp(get(ax,'YAxisLocation'),'right')
                         [angle, align] = improvedYLabel(ax, 0, 'Left');
@@ -1311,6 +1325,9 @@ if strcmp(get(ax,'Visible'),'on')
                     % for all ticks. Strange behavior but follows the
                     % behavior of Matlab
                     axlabelz = repmat(axlabelz, length(axzindex), 1);
+                end
+                if (strcmp(get(ax,'ZTickLabelMode'),'manual'))
+                    axlabelz = axlabelz(axzindex,:);
                 end
                 for i = 1:length(axzindex)
                     label2svg(fid,grouplabel,axpos,ax,xg_label_end(i),yg_label_end(i),convertString(axlabelz(i,:)),'Right',0,'middle',1,paperpos,scolorname,exponent);
@@ -2426,7 +2443,10 @@ if strcmp(get(ax,'XTickLabelMode'),'auto') && strcmp(get(ax,'XScale'),'linear')
             numlabels(ix) = str2num(axlabelx{ix});
         end
     else
-        numlabels = str2num(get(ax,'XTickLabel'));
+        numlabels = get(ax,'XTickLabel');
+        if ~isempty(numlabels)
+          numlabels = str2double(numlabels);
+        end
     end
     labelpos = axxtick;%get(ax,'XTick');
     numlabels = numlabels(:);
@@ -2451,7 +2471,10 @@ if strcmp(get(ax,'YTickLabelMode'),'auto') && strcmp(get(ax,'YScale'),'linear')
             numlabels(ix) = str2num(axlabely{ix});
         end        
     else
-        numlabels = str2num(get(ax,'YTickLabel'));
+        numlabels = get(ax,'YTickLabel');
+        if ~isempty(numlabels)
+          numlabels = str2double(numlabels);
+        end
     end
     labelpos = axytick;%get(ax,'YTick');
     numlabels = numlabels(:);
@@ -2476,7 +2499,10 @@ if strcmp(get(ax,'ZTickLabelMode'),'auto') && strcmp(get(ax,'ZScale'),'linear')
             numlabels(ix) = str2num(axlabelz{ix});
         end
     else
-        numlabels = str2num(get(ax,'ZTickLabel'));
+        numlabels = get(ax,'ZTickLabel');
+        if ~isempty(numlabels)
+          numlabels = str2double(numlabels); 
+        end
     end
     labelpos = axztick;%get(ax,'ZTick');
     numlabels = numlabels(:);
