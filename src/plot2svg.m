@@ -108,6 +108,7 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               number of ticks (thanks to Anna)
 %  18-07-2013 - Small fix to exclude change log from help
 %               (thanks to Stuart Layton)
+%  30-11-2014 - Preliminary partial support for contour objects
 
 global PLOT2SVG_globals
 global colorname
@@ -1480,7 +1481,7 @@ for i=length(axchild):-1:1
                     edgecolor = c(1,index);
                     if ~isnan(edgecolor)
                         if strcmp(get(axchild(i),'LineColor'),'flat')   % Bugfix 27.01.2008
-                            edgecolorname = searchcolor(id,edgecolor/64);
+                            edgecolorname = searchcolor(id,cmap(pointc,:));
                         else
                             edgecolorname = searchcolor(id,edgecolor);
                         end
