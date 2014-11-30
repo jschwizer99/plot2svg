@@ -1446,6 +1446,57 @@ for i=length(axchild):-1:1
         animation2svg(fid, axchild(i));
         % close the line group
         fprintf(fid,'</g>\n');
+    elseif strcmp(get(axchild(i),'Type'),'contour')
+        clim = get(ax,'CLim');
+        cmap = get(id,'Colormap');
+        c = get(axchild(i),'ContourMatrix');
+        linestyle = get(axchild(i),'LineStyle');
+        linewidth = get(axchild(i),'LineWidth');
+        edge_opacity = 1.0;
+        face_opacity = 1.0;
+        index = 1;
+        while index < size(c,2)
+            patchIndices = (1:c(2,index))+index;
+            % Close a patch if the coordinates do not contain NaNs 
+            x = c(1,patchIndices);
+            y = c(2,patchIndices);
+            if (x(1) == x(end)) && (y(1) == y(end))
+                closed = true;
+            else
+                closed = false;
+            end            
+            [x,y,z] = project(x,y,ones(1,c(2,index))*c(1,index),projection);
+            x = (x*axpos(3)+axpos(1))*paperpos(3);
+            y = (1-(y*axpos(4)+axpos(2)))*paperpos(4);
+            pointc = c(1,index);
+            pointc = round((pointc-clim(1))/(clim(2)-clim(1))*(size(cmap,1)-1)+1);
+            % Limit index to smallest or biggest color index
+            pointc = max(pointc,1);
+            pointc = min(pointc,size(cmap,1));
+            if ischar(get(axchild(i),'LineColor'))
+                if strcmp(get(axchild(i),'LineColor'),'none')
+                    edgecolorname = 'none';
+                else
+                    edgecolor = c(1,index);
+                    if ~isnan(edgecolor)
+                        if strcmp(get(axchild(i),'LineColor'),'flat')   % Bugfix 27.01.2008
+                            edgecolorname = searchcolor(id,edgecolor/64);
+                        else
+                            edgecolorname = searchcolor(id,edgecolor);
+                        end
+                    else
+                        edgecolorname = 'none';
+                    end
+                end
+            else
+                edgecolorname = searchcolor(id,get(axchild(i),'EdgeColor'));       
+            end
+            if strcmp(get(axchild(i),'Fill'),'on')
+                facecolorname = searchcolor(id,cmap(pointc,:));
+            end
+            patch2svg(fid, group, axpos, x, y, facecolorname, linestyle, linewidth, edgecolorname, face_opacity, edge_opacity, closed)
+            index = index+c(2,index)+1;
+        end
     elseif strcmp(get(axchild(i),'Type'),'patch')
         flat_shading = 1;
         cmap=get(id,'Colormap');
