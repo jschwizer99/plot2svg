@@ -110,6 +110,10 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               (thanks to Stuart Layton)
 %  30-11-2014 - Preliminary partial support for contour objects
 
+% Edits made by Jonathon Harding
+%  18-02-2015 - Removed calls to `find` inside variable indexes, as these
+%               are not necessary for MATLAB
+
 global PLOT2SVG_globals
 global colorname
 progversion='16-Feb-2013';
@@ -290,15 +294,15 @@ if PLOT2SVG_globals.checkUserData && isstruct(get(id,'UserData'))
                     clipz = clip(:, 3);
                 end
                 if strcmp(get(ax,'XScale'),'log')
-                    clipx(find(clipx<=0)) = NaN;
+                    clipx(clipx<=0) = NaN;
                     clipx=log10(clipx);
                 end
                 if strcmp(get(ax,'YScale'),'log')
-                    clipy(find(clipy<=0)) = NaN;
+                    clipy(clipy<=0) = NaN;
                     clipy=log10(clipy);
                 end
                 if strcmp(get(ax,'ZScale'),'log')
-                    clipz(find(clipz<=0)) = NaN;
+                    clipz(clipz<=0) = NaN;
                     clipz=log10(clipz);
                 end
                 [x,y,z] = project(clipx,clipy,clipz,projection);
@@ -788,15 +792,15 @@ axlimyori=axlimy;
 axlimzori=axlimz;
 if strcmp(get(ax,'XScale'),'log')
     axlimx=log10(axlimx);
-    axlimx(find(isinf(axlimx)))=0;
+    axlimx(isinf(axlimx))=0;
 end
 if strcmp(get(ax,'YScale'),'log')
     axlimy=log10(axlimy);
-    axlimy(find(isinf(axlimy)))=0;
+    axlimy(isinf(axlimy))=0;
 end
 if strcmp(get(ax,'ZScale'),'log')
     axlimz=log10(axlimz);
-    axlimz(find(isinf(axlimz)))=0;
+    axlimz(isinf(axlimz))=0;
 end
 if strcmp(get(ax,'XDir'),'reverse')
     axlimx = fliplr(axlimx);
@@ -898,7 +902,7 @@ if strcmp(get(ax,'Visible'),'on')
         for stick = [2*axxtick(1)-axxtick(2) axxtick]
             minor_axxtick = [minor_axxtick minor_lin_sticks + stick]; 
         end
-        minor_axxtick = minor_axxtick(find(minor_axxtick > min(axlimx) & minor_axxtick < max(axlimx)));
+        minor_axxtick = minor_axxtick(minor_axxtick > min(axlimx) & minor_axxtick < max(axlimx));
     else
         minor_axxtick = [];
     end
@@ -908,7 +912,7 @@ if strcmp(get(ax,'Visible'),'on')
         for stick = [2*axytick(1)-axytick(2) axytick]
             minor_axytick = [minor_axytick minor_lin_sticks + stick]; 
         end
-        minor_axytick = minor_axytick(find(minor_axytick > min(axlimy) & minor_axytick < max(axlimy)));
+        minor_axytick = minor_axytick(minor_axytick > min(axlimy) & minor_axytick < max(axlimy));
     else
         minor_axytick = [];
     end
@@ -918,7 +922,7 @@ if strcmp(get(ax,'Visible'),'on')
         for stick = [2*axztick(1)-axztick(2) axztick]
             minor_axztick = [minor_axztick minor_lin_sticks + stick]; 
         end
-        minor_axztick = minor_axztick(find(minor_axztick > min(axlimz) & minor_axztick < max(axlimz)));
+        minor_axztick = minor_axztick(minor_axztick > min(axlimz) & minor_axztick < max(axlimz));
     else
         minor_axztick = [];
     end
@@ -951,7 +955,7 @@ if strcmp(get(ax,'Visible'),'on')
                 minor_axxtick = [minor_axxtick minor_log_sticks + stick]; 
             end
         end
-        minor_axxtick = minor_axxtick(find(minor_axxtick > min(axlimx) & minor_axxtick < max(axlimx)));
+        minor_axxtick = minor_axxtick(minor_axxtick > min(axlimx) & minor_axxtick < max(axlimx));
     end
     if strcmp(get(ax,'YScale'),'log')
         axytick=log10(get(ax,'YTick'));
@@ -962,7 +966,7 @@ if strcmp(get(ax,'Visible'),'on')
                 minor_axytick = [minor_axytick minor_log_sticks + stick]; 
             end
         end
-        minor_axytick = minor_axytick(find(minor_axytick > min(axlimy) & minor_axytick < max(axlimy)));
+        minor_axytick = minor_axytick(minor_axytick > min(axlimy) & minor_axytick < max(axlimy));
     end
     if strcmp(get(ax,'ZScale'),'log')
         axztick=log10(get(ax,'ZTick'));
@@ -973,7 +977,7 @@ if strcmp(get(ax,'Visible'),'on')
                 minor_axztick = [minor_axztick minor_log_sticks + stick]; 
             end
         end
-        minor_axztick = minor_axztick(find(minor_axztick > min(axlimz) & minor_axztick < max(axlimz)));
+        minor_axztick = minor_axztick(minor_axztick > min(axlimz) & minor_axztick < max(axlimz));
     end
     % Draw back faces 
     linewidth=get(ax,'LineWidth');
@@ -1377,13 +1381,13 @@ for i=length(axchild):-1:1
         linex = get(axchild(i),'XData');
         linex = linex(:)'; % Octave stores the data in a column vector
         if strcmp(get(ax,'XScale'),'log')
-            linex(find(linex<=0)) = NaN;
+            linex(linex<=0) = NaN;
             linex=log10(linex);
         end
         liney=get(axchild(i),'YData');
         liney = liney(:)'; % Octave stores the data in a column vector        
         if strcmp(get(ax,'YScale'),'log')
-            liney(find(liney<=0)) = NaN;
+            liney(liney<=0) = NaN;
             liney=log10(liney);
         end
         linez=get(axchild(i),'ZData');
@@ -1392,7 +1396,7 @@ for i=length(axchild):-1:1
             linez = zeros(size(linex));    
         end
         if strcmp(get(ax,'ZScale'),'log')
-            linez(find(linez<=0)) = NaN;
+            linez(linez<=0) = NaN;
             linez=log10(linez);
         end
         [x,y,z] = project(linex,liney,linez,projection);
@@ -1882,12 +1886,12 @@ for i=length(axchild):-1:1
         position = get(axchild(i),'Position');
         posx = [position(1) position(1)+position(3)];
         if strcmp(get(ax,'XScale'),'log')
-            posx(find(posx <= 0)) = NaN;
+            posx(posx <= 0) = NaN;
             posx=log10(posx);
         end
         posy = [position(2) position(2)+position(4)];
         if strcmp(get(ax,'YScale'),'log')
-            posy(find(posy <= 0)) = NaN;
+            posy(posy <= 0) = NaN;
             posy=log10(posy);
         end
         posz=[0 0];
@@ -2787,7 +2791,7 @@ if ~isempty(StringText)
         fprintf(['Warning: Found a closed brace without a previously opened brace. Latex string ''' StringText ''' will not be converted.\n']);
     else
         if isempty(bracket)
-            if ~isempty(find(StringText == '^' | StringText == '_' | StringText == '\' ))
+            if any(StringText == '^' | StringText == '_' | StringText == '\' )
                 returnvalue = ['<tspan>' singleLatex2svg(StringText, size) '</tspan>'];    
                 % Clean up empty tspan elements
                 % More could be done here, but with huge effort to make it
