@@ -113,6 +113,8 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 % Edits made by Jonathon Harding
 %  18-02-2015 - Removed calls to `find` inside variable indexes, as these
 %               are not necessary for MATLAB
+%  18-02-2015 - Added MException catching to try/catch blocks and the
+%               assocciated warning messages
 
 global PLOT2SVG_globals
 global colorname
@@ -593,8 +595,12 @@ if PLOT2SVG_globals.checkUserData && isstruct(get(id,'UserData'))
                         otherwise
                             error(['Unknown filter ''' filter(i).Subfilter.Type '''.']);
                     end
-                catch
-                    error([lasterr ' Error is caused by filter type ''' filter(i).Subfilter.Type '''.']);
+                catch ME
+                    errStr = ME.identifier;
+                    if isempty(errStr)
+                        errStr = ME.message;
+                    end
+                    error([errStr ' Error is caused by filter type ''' filter(i).Subfilter.Type '''.']);
                 end
             end
             fprintf(fid,'  </filter>\n');
@@ -2860,8 +2866,12 @@ if ~isempty(StringText)
         end
     end
 end
-catch
-    fprintf(['Warning: Error ''' lasterr ''' occurred during conversion. Latex string ''' StringText ''' will not be converted.\n']);
+catch ME
+    errStr = ME.identifier;
+    if isempty(errStr)
+        errStr = ME.message;
+    end
+    fprintf(['Warning: Error ''' errStr ''' occurred during conversion. Latex string ''' StringText ''' will not be converted.\n']);
 end
 
 function StringText = singleLatex2svg(StringText, size)
