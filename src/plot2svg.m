@@ -117,6 +117,10 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               assocciated warning messages
 %  19-02-2015 - Updated line2svg to never create line segments longer than
 %               5000 points, even if the data includes some NaN elements
+%  19-02-2015 - convertunit now properly converts between MATLAB pixels
+%               (which are variable) and SVG pixels (fixed at 90 ppi) in
+%               all cases. Text will be appropriately sized when MATLAB is
+%               run in High-DPI mode
 
 global PLOT2SVG_globals
 global colorname
@@ -202,7 +206,7 @@ if ( nargin > 0)
         paperpos(4)=param1(2);
     end
 end
-paperpos = paperpos * 90 / PLOT2SVG_globals.ScreenPixelsPerInch;
+paperpos = convertunit(paperpos, 'pixels', 'pixels');
 if (nargin < 3)
     PLOT2SVG_globals.pixelfiletype = 'png';
 else
@@ -2610,9 +2614,6 @@ else
     latex=1;
 end
 fontsize=convertunit(get(id,'FontSize'),get(id,'FontUnits'),'points', axpos(4));   % convert fontsize to inches
-paperposOriginal=get(gcf,'Position');
-fontsize=fontsize*paperpos(4)/paperposOriginal(4);
-textfontsize=textfontsize*paperpos(4)/paperposOriginal(4);
 fontweight = get(id,'FontWeight');
 switch lower(fontweight)
     case 'bold', fweight = ' font-weight="bold"';
@@ -2931,17 +2932,21 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function rvalue = convertunit(value, from, to, parentheight)
+global PLOT2SVG_globals
 % From SVG 1.1. Specification:
 % "1pt" equals "1.25px" (and therefore 1.25 user units)
 % "1pc" equals "15px" (and therefore 15 user units)
 % "1mm" would be "3.543307px" (3.543307 user units)
 % "1cm" equals "35.43307px" (and therefore 35.43307 user units)
 % "1in" equals "90px" (and therefore 90 user units)
+% Modification by Jonathon Harding:
+% MATLAB however, assumes a variable number of pixels per inch, and
+% assuming that the pixels match is dangerous.
 if nargin < 4
     parentheight = 1.25;    % Default
 end
 switch lower(from)  % convert from input unit to points
-    case 'pixels', rvalue = value * 0.8;
+    case 'pixels', rvalue = value * 72/PLOT2SVG_globals.ScreenPixelsPerInch;
     case 'points', rvalue = value;
     case 'centimeters', rvalue = value / 2.54*72;
     case 'inches', rvalue = value * 72; % 72 points = 1 inch
