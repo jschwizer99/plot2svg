@@ -132,6 +132,8 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               have an alpha value, as far as I know
 %  19-02-2015 - Update for MATLAB 2015b: use axes OuterPosition for axes
 %               placement
+%  19-02-2015 - Properly calculate the axes limits when the user has
+%               specified infinite limits
 
 global PLOT2SVG_globals
 global colorname
@@ -816,6 +818,10 @@ groupax=group;
 axlimx=get(ax,'XLim');
 axlimy=get(ax,'YLim');
 axlimz=get(ax,'ZLim');
+[axinflimx, axinflimy, axinflimz] = AxesChildBounds(ax);
+axlimx(isinf(axlimx)) = axinflimx(isinf(axlimx));
+axlimy(isinf(axlimy)) = axinflimy(isinf(axlimy));
+axlimz(isinf(axlimz)) = axinflimz(isinf(axlimz));
 axlimxori=axlimx;
 axlimyori=axlimy;
 axlimzori=axlimz;
@@ -3135,6 +3141,10 @@ xi = get(ax,'XLim');
 yi = get(ax,'YLim');
 zi = get(ax,'ZLim');
 projection.aspect_scaling = get(ax,'DataAspectRatio');
+[xinfi, yinfi, zinfi] = AxesChildBounds(ax);
+xi(isinf(xi)) = xinfi(isinf(xi));
+yi(isinf(yi)) = yinfi(isinf(yi));
+zi(isinf(zi)) = zinfi(isinf(zi));
 if strcmp(get(ax,'XScale'),'log')
     if strcmp(get(ax,'XLimMode'),'manual') && any(get(ax,'XLim') == 0)
         % Fix illegal scalings set by the user
@@ -3304,3 +3314,49 @@ q(m:m:end) = [];
 fvc = reshape(c, [cm*cn cp]);
 fva = reshape(a, [am*an ap]);
 f = [q q+m q+m+1 q+1];
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Code by Jonathon Harding to detect axes child limits
+function [xlims, ylims, zlims] = AxesChildBounds(ax)
+    % Get all the direct children of the axes that are not also axes (i.e.
+    % old style legends)
+    children = findobj(ax, '-depth', 1, '-not', 'Type', 'axes');
+    % Now get all children of those objects that have data we can analyze
+    dataObjs = findobj(children, 'Type', 'image', '-or', 'Type', 'line', ...
+        '-or', 'Type', 'patch', '-or', 'Type', 'Rectangle', '-or', 'Type', 'Surface');
+    % Generate default limits if no objects are found
+    xlims = [0 1];
+    ylims = [0 1];
+    zlims = [0 1];
+    if numel(dataObjs) == 0
+        return;
+    end
+    % Iterate through each axis one at a time
+    axisData = {'XData', 'YData', 'ZData'};
+    for i=1:numel(axisData)
+        % Set extreme bounds that will always be overridden
+        lims = [inf -inf];
+        for j=1:numel(dataObjs)
+            % For each object, get the data for the appropriate axis
+            data = reshape(get(dataObjs(j), axisData{i}), [], 1);
+            % Remove data that is not displayed
+            data(isinf(data) | isnan(data)) = [];
+            % If any data remains, update the limits
+            if ~isempty(data)
+                lims(1) = min(lims(1), min(data));
+                lims(2) = max(lims(2), max(data));
+            end
+        end
+        % If the limits are not infinite (i.e. no data found), then update
+        % the apropriate axis limits
+        if ~any(isinf(lims))
+            switch axisData{i}
+                case 'XData'
+                    xlims = lims;
+                case 'YData'
+                    ylims = lims;
+                case 'ZData'
+                    zlims = lims;
+            end
+        end
+    end
