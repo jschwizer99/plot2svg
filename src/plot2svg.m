@@ -134,6 +134,8 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               placement
 %  19-02-2015 - Properly calculate the axes limits when the user has
 %               specified infinite limits
+%  19-02-2015 - Added bug fix for when ticks are specified outside the plot
+%               window
 
 global PLOT2SVG_globals
 global colorname
@@ -2590,6 +2592,7 @@ if strcmp(get(ax,'XTickLabelMode'),'auto') && strcmp(get(ax,'XScale'),'linear')
     numlabels = numlabels(:);
     labelpos = labelpos(:);
     indexnz = find(labelpos ~= 0);
+    indexnz(indexnz > numel(numlabels)) = [];
     if (~isempty(indexnz) && ~isempty(numlabels))
         ratio=numlabels(indexnz)./labelpos(indexnz);
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
@@ -2618,6 +2621,7 @@ if strcmp(get(ax,'YTickLabelMode'),'auto') && strcmp(get(ax,'YScale'),'linear')
     numlabels = numlabels(:);
     labelpos = labelpos(:);
     indexnz = find(labelpos ~= 0);
+    indexnz(indexnz > numel(numlabels)) = [];
     if (~isempty(indexnz) && ~isempty(numlabels))
         ratio = numlabels(indexnz)./labelpos(indexnz);
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
@@ -2646,6 +2650,7 @@ if strcmp(get(ax,'ZTickLabelMode'),'auto') && strcmp(get(ax,'ZScale'),'linear')
     numlabels = numlabels(:);
     labelpos = labelpos(:);
     indexnz = find(labelpos ~= 0);
+    indexnz(indexnz > numel(numlabels)) = [];
     if (~isempty(indexnz) && ~isempty(numlabels))
         ratio = numlabels(indexnz)./labelpos(indexnz);
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
