@@ -121,6 +121,11 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               (which are variable) and SVG pixels (fixed at 90 ppi) in
 %               all cases. Text will be appropriately sized when MATLAB is
 %               run in High-DPI mode
+%  19-02-2015 - Updated text rendering code. Translation and rotation are
+%               now applied in a single step, directly to the text object
+%               (rather than in groups surrounding it). Super- and
+%               sub-scripts are now generated using SVG standard values for
+%               baseline-shift and font-size percentages
 
 global PLOT2SVG_globals
 global colorname
@@ -2435,6 +2440,7 @@ fprintf(fid,'<image x="%0.3f" y="%0.3f" width="%0.3f" height="%0.3f" image-rende
 function text2svg(fid,group,axpos,paperpos,id,ax,projection)
 global PLOT2SVG_globals;
 originalTextUnits=get(id,'Units');
+originalTextPosition = get(id, 'Position');
 if PLOT2SVG_globals.octave
 	set(id,'Units','data');
 else
@@ -2478,8 +2484,8 @@ textvalign = get(id,'VerticalAlignment');
 textalign = get(id,'HorizontalAlignment');
 texttext = get(id,'String');
 textrot = get(id,'Rotation');
-dx = sin(textrot * pi / 180) * (fontsize * 1.25 * 1.2);
-dy = cos(textrot * pi / 180) * (fontsize * 1.25 * 1.2);
+dx = sin(textrot * pi / 180) * convertunit(fontsize * 1.2, 'points', 'pixels');
+dy = cos(textrot * pi / 180) * convertunit(fontsize * 1.2, 'points', 'pixels');
 lines = max(size(get(id,'String'),1),1);
 if size(texttext,2)~=0
     j = 1;
@@ -2495,6 +2501,7 @@ else
     label2svg(fid,group,axpos,id,x,y,'',textalign,textrot,textvalign,lines,paperpos,font_color,0)
 end
 set(id,'Units',originalTextUnits);
+set(id,'Position', originalTextPosition);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % adds the exponents to the axis thickmarks if needed
@@ -2525,7 +2532,7 @@ if strcmp(get(ax,'XTickLabelMode'),'auto') && strcmp(get(ax,'XScale'),'linear')
     if (~isempty(indexnz) && ~isempty(numlabels))
         ratio=numlabels(indexnz)./labelpos(indexnz);
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
-            exptext = sprintf('&#215; 10<tspan font-size="%0.1fpt" dy="%0.1fpt">%g</tspan>', 0.7*fontsize, -0.7*fontsize,-log10(ratio(1)));
+            exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
             label2svg(fid,group,axpos,ax,(axpos(1)+axpos(3))*paperpos(3),(1-axpos(2))*paperpos(4)+3*fontsize,exptext,'right',0,'top',1,paperpos,font_color,0)           
         end
     end
@@ -2553,7 +2560,7 @@ if strcmp(get(ax,'YTickLabelMode'),'auto') && strcmp(get(ax,'YScale'),'linear')
     if (~isempty(indexnz) && ~isempty(numlabels))
         ratio = numlabels(indexnz)./labelpos(indexnz);
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
-            exptext = sprintf('&#215; 10<tspan font-size="%0.1fpt" dy="%0.1fpt">%g</tspan>',0.7*fontsize,-0.7*fontsize,-log10(ratio(1)));
+            exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
             label2svg(fid,group,axpos,ax,axpos(1)*paperpos(3),(1-(axpos(2)+axpos(4)))*paperpos(4)-0.5*fontsize,exptext,'left',0,'bottom',1,paperpos,font_color,0)           
         end
     end
@@ -2581,7 +2588,7 @@ if strcmp(get(ax,'ZTickLabelMode'),'auto') && strcmp(get(ax,'ZScale'),'linear')
     if (~isempty(indexnz) && ~isempty(numlabels))
         ratio = numlabels(indexnz)./labelpos(indexnz);
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
-            exptext = sprintf('&#215; 10<tspan font-size="%0.1fpt" dy="%0.1fpt">%g</tspan>',0.7*fontsize,-0.7*fontsize,-log10(ratio(1)));
+            exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
             label2svg(fid,group,axpos,ax,axpos(1)*paperpos(3),(1-(axpos(2)+axpos(4)))*paperpos(4)-0.5*fontsize,exptext,'left',0,'top',1,paperpos,font_color,0)           
         end
     end
@@ -2765,25 +2772,29 @@ if latex==1
     
     %fprintf('%s\n', tex);
     tex=latex2svg(tex, textfontname, textfontsize, 0);
+else
+    tex=sprintf('<tspan>%s</tspan>', tex);
 end
 if isempty(tex)
     return;
 end
-if exponent
-    tex=sprintf('10<tspan font-size="%0.1fpt" dy="%0.1fpt">%s</tspan>', 0.7*textfontsize, -0.7*textfontsize, tex);
-    shift = shift + 0.4*fontsize;   % Small correction to make it look nicer
-end
 % Note: Obviously, Matlab is using font sizes that are rounded to decimal
 % pt sizes. This may cause problems for very small figures. But we have to
 % follow due to the background size.
-%fprintf('%s\n', tex);
-fprintf(fid,'  <g transform="translate(%0.3f,%0.3f)">\n', x - shift * sin(-angle/180*pi), y + shift * cos(-angle/180*pi));
-fprintf(fid,'    <g transform="rotate(%0.1f)">\n',-angle);
-fprintf(fid,'      <text x="%0.3f" y="%0.3f" font-family="%s" text-anchor="%s" font-size="%0.0fpt"%s%s fill="%s" >', 0, 0, textfontname, anchor, textfontsize, fweight, fangle, font_color);
-fprintf(fid,'%s',tex);
+% Build a transformation matrix here
+transMat = eye(3);
+rotMat = eye(3);
+angle = -angle/180*pi; % Convert angle from degrees to radians, and flip direction
+transMat(1,3) = x - shift * sin(angle);
+transMat(2,3) = y + shift * cos(angle);
+rotMat(1,1) =  cos(angle);
+rotMat(1,2) = -sin(angle);
+rotMat(2,1) =  sin(angle);
+rotMat(2,2) =  cos(angle);
+CTM = transMat*rotMat;
+transformStr = sprintf(' transform="matrix(%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f)"', CTM(1,1), CTM(2,1), CTM(1,2), CTM(2,2), CTM(1,3), CTM(2,3));
+fprintf(fid,'  <text %s x="%0.3f" y="%0.3f" font-family="%s" text-anchor="%s" font-size="%0.0fpt"%s%s fill="%s" >', transformStr, 0, 0, textfontname, anchor, textfontsize, fweight, fangle, font_color);fprintf(fid,'%s',tex);
 fprintf(fid,'</text>\n'); 
-fprintf(fid,'    </g>\n');
-fprintf(fid,'  </g>\n');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % converts LATEX strings into SVG strings
@@ -2809,65 +2820,50 @@ if ~isempty(StringText)
                 % match all special cases.
                 returnvalue = strrep(returnvalue, '></tspan><tspan>', '>');
             else
-                returnvalue = StringText;    
+                returnvalue = ['<tspan>' StringText '</tspan>'];
             end
         else
             returnvalue = '<tspan>';
             lastValidCharacter = 1;
-            localSize = size;
-            restoreOffset = [];
-            restoreSize = [];
             for i = 1:length(bracket)
                 lastValidCharacterOffset = 1;
                 if StringText(bracket(i)) == '{'
                     % Found '{'
                     removeCharacters = 1;
                     localOffset = 0;
-                    restoreOffset(bracketCounter(bracket(i))) = 0;
-                    restoreSize(bracketCounter(bracket(i))) = localSize;
                     if (bracket(i) > 1)
                         if StringText(bracket(i) - 1) == '_'
-                            localOffset = -0.4 * localSize;
-                            localSize = 0.7 * localSize;
-                            restoreOffset(bracketCounter(bracket(i))) = -localOffset;
+                            baselineShift = 'sub';
+                            localFontSize = '65%%';
+                            localOffset = -1;
                             removeCharacters = 2;
                         elseif StringText(bracket(i) - 1) == '^'
-                            localOffset = 0.5 * localSize;
-                            localSize = 0.7 * localSize;
-                            restoreOffset(bracketCounter(bracket(i))) = -localOffset;
+                            baselineShift = 'super';
+                            localFontSize = '65%%';
+                            localOffset = 1;
                             removeCharacters = 2;
                         end
                     end
-                    returnvalue = [returnvalue singleLatex2svg(StringText(lastValidCharacter:bracket(i) - removeCharacters), restoreSize(bracketCounter(bracket(i)))) '</tspan><tspan'];
+                    returnvalue = [returnvalue singleLatex2svg(StringText(lastValidCharacter:bracket(i) - removeCharacters)) '<tspan'];
                     if localOffset ~= 0
-                        returnvalue = [returnvalue ' dy="' num2str(-localOffset, '%0.1f') 'pt"'];
-                    end
-                    if localSize ~= restoreSize(bracketCounter(bracket(i)))
-                        returnvalue = [returnvalue ' font-size="' num2str(localSize, '%0.0f') 'pt"'];                        
+                        returnvalue = [returnvalue ' style="baseline-shift:' baselineShift ';font-size:' localFontSize '"'];                     
                     end
                     returnvalue = [returnvalue '>'];
                 else
                     % Found '}'
-                    returnvalue = [returnvalue singleLatex2svg(StringText(lastValidCharacter:bracket(i) - 1), localSize) '</tspan><tspan'];
-                    if restoreOffset(bracketCounter(bracket(i) - 1)) ~= 0
-                        returnvalue = [returnvalue ' dy="' num2str(-restoreOffset(bracketCounter(bracket(i) - 1)), '%0.1f') 'pt"'];
-                    end
-                    if restoreSize(bracketCounter(bracket(i) - 1)) ~= localSize
-                        localSize = restoreSize(bracketCounter(bracket(i) - 1));
-                        returnvalue = [returnvalue ' font-size="' num2str(localSize, '%0.0f') 'pt"'];
-                    end
-                    returnvalue = [returnvalue '>'];
+                    returnvalue = [returnvalue singleLatex2svg(StringText(lastValidCharacter:bracket(i) - 1)) '</tspan>'];
                 end
                 lastValidCharacter = bracket(i) + lastValidCharacterOffset;
             end
             if lastValidCharacter <= length(StringText)
-                returnvalue = [returnvalue singleLatex2svg(StringText(lastValidCharacter:end), localSize)];
+                returnvalue = [returnvalue singleLatex2svg(StringText(lastValidCharacter:end))];
             end
             returnvalue = [returnvalue '</tspan>'];
             % Clean up empty tspan elements
             % More could be done here, but with huge effort to make it
             % match all special cases.
             returnvalue = strrep(returnvalue, '></tspan><tspan>', '>');
+            returnvalue = strrep(returnvalue, '>>', '>');
         end
     end
 end
@@ -2888,20 +2884,18 @@ if ~isempty(index)
     end
     for i = length(index):-1:1
         if StringText(index(i)) == '_'
-            localOffset = 0.4 * size;
-            localSize = 0.7 * size;
             StringText = [StringText(1:index(i)-1) ...
-                    '</tspan><tspan dy="' num2str(localOffset, '%0.1f') 'pt" font-size="' num2str(localSize, '%0.0f') 'pt">' ...
+                    '<tspan style="baseline-shift:sub;font-size:65%%">' ...
                     StringText(index(i)+1) ...
-                    '</tspan><tspan dy="' num2str(-localOffset, '%0.1f') 'pt" font-size="' num2str(size, '%0.0f') 'pt">' ...
+                    '</tspan>' ...
                     StringText(index(i)+2:end)];
         else
             localOffset = 0.5 * size;
             localSize = 0.7 * size;
             StringText = [StringText(1:index(i)-1) ...
-                    '</tspan><tspan dy="' num2str(-localOffset, '%0.1f') 'pt" font-size="' num2str(localSize, '%0.0f') 'pt">' ...
+                    '<tspan style="baseline-shift:super;font-size:65%%">' ...
                     StringText(index(i)+1) ...
-                    '</tspan><tspan dy="' num2str(localOffset, '%0.1f') 'pt" font-size="' num2str(size, '%0.0f') 'pt">' ...
+                    '</tspan>' ...
                     StringText(index(i)+2:end)];
         end
     end
