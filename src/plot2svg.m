@@ -130,6 +130,8 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               opacity and colors). line2svg now supports opacity,
 %               although MATLAB does not allow ordinary line objects to
 %               have an alpha value, as far as I know
+%  19-02-2015 - Update for MATLAB 2015b: use axes OuterPosition for axes
+%               placement
 
 global PLOT2SVG_globals
 global colorname
@@ -2451,7 +2453,11 @@ end
 function control2svg(fid,id,ax,group,paperpos)
 global PLOT2SVG_globals
 set(ax,'Units','pixels');
-pos=get(ax,'Position');
+if verLessThan('matlab', '8.4.0')
+    pos=get(ax,'Position');
+else
+    pos=ax.OuterPosition;
+end
 pict=getframe(id,pos);
 if isempty(pict.colormap)
     pict.colormap=colormap;
