@@ -126,6 +126,10 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               (rather than in groups surrounding it). Super- and
 %               sub-scripts are now generated using SVG standard values for
 %               baseline-shift and font-size percentages
+%  19-02-2015 - Support for MATLAB 2014b grids added (Grids can have custom
+%               opacity and colors). line2svg now supports opacity,
+%               although MATLAB does not allow ordinary line objects to
+%               have an alpha value, as far as I know
 
 global PLOT2SVG_globals
 global colorname
@@ -751,22 +755,28 @@ for k = 1:length(index)
     end
 end
 
-function gridLines(fid, grouplabel, axpos, x, y, scolorname, gridlinestyle, linewidth, axlim, axtick, axindex_inner, corners, c)
+function gridLines(fid, grouplabel, axpos, x, y, scolorname, gridlinestyle, linewidth, axlim, axtick, axindex_inner, corners, c, gridAlpha)
 xg_line_start = interp1([axlim(1) axlim(2)],[x(corners(c(1))) x(corners(c(2)))], axtick);
 yg_line_start = interp1([axlim(1) axlim(2)],[y(corners(c(1))) y(corners(c(2)))], axtick);
 xg_line_end = interp1([axlim(1) axlim(2)],[x(corners(c(3))) x(corners(c(4)))], axtick);
 yg_line_end = interp1([axlim(1) axlim(2)],[y(corners(c(3))) y(corners(c(4)))], axtick);
+if nargin < 14 || isempty(gridAlpha)
+    gridAlpha = 1;
+end
 for i = axindex_inner
-    line2svg(fid, grouplabel, axpos, [xg_line_start(i) xg_line_end(i)],[yg_line_start(i) yg_line_end(i)], scolorname, gridlinestyle, linewidth)
+    line2svg(fid, grouplabel, axpos, [xg_line_start(i) xg_line_end(i)],[yg_line_start(i) yg_line_end(i)], scolorname, gridlinestyle, linewidth, gridAlpha)
 end
 
-function minorGridLines(fid, grouplabel, axpos, x, y, scolorname, minor_gridlinestyle, linewidth, axlim, minor_axtick, corners, c)
+function minorGridLines(fid, grouplabel, axpos, x, y, scolorname, minor_gridlinestyle, linewidth, axlim, minor_axtick, corners, c, gridAlpha)
 xg_line_start = interp1([axlim(1) axlim(2)],[x(corners(c(1))) x(corners(c(2)))], minor_axtick);
 yg_line_start = interp1([axlim(1) axlim(2)],[y(corners(c(1))) y(corners(c(2)))], minor_axtick);
 xg_line_end = interp1([axlim(1) axlim(2)],[x(corners(c(3))) x(corners(c(4)))], minor_axtick);
 yg_line_end = interp1([axlim(1) axlim(2)],[y(corners(c(3))) y(corners(c(4)))], minor_axtick);
+if nargin < 14 || isempty(gridAlpha)
+    gridAlpha = 1;
+end
 for i = 1:length(xg_line_start)
-    line2svg(fid, grouplabel, axpos, [xg_line_start(i) xg_line_end(i)],[yg_line_start(i) yg_line_end(i)], scolorname, minor_gridlinestyle, linewidth)
+    line2svg(fid, grouplabel, axpos, [xg_line_start(i) xg_line_end(i)],[yg_line_start(i) yg_line_end(i)], scolorname, minor_gridlinestyle, linewidth, gridAlpha)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SUBFUNCTIONS %%%%%
@@ -1012,15 +1022,31 @@ if strcmp(get(ax,'Visible'),'on')
         p = back_faces(pindex);
         for k = 1:size(corners,1)
             selectedCorners = squeeze(corners(k,:,p));
+            if verLessThan('matlab', '8.4.0')
+                gridAlpha = 1;
+                minorGridAlpha = 1;
+            else
+                gridAlpha = get(ax, 'GridAlpha');
+                minorGridAlpha = get(ax, 'MinorGridAlpha');
+            end
             switch corners(k,1,p)
                 case 1 % x
                     % Draw x-grid
-                    scolorname = searchcolor(id,get(ax,'XColor'));
+                    if verLessThan('matlab', '8.4.0')
+                        scolorname = get(ax, 'XColor');
+                    else
+                        if strcmp(get(ax, 'GridColorMode'), 'auto')
+                            scolorname = get(ax, 'XColor');
+                        else
+                            scolorname = get(ax, 'GridColor');
+                        end
+                    end
+                    scolorname = searchcolor(id,scolorname);
                     if strcmp(get(ax,'XGrid'),'on') && gridBehind
                         if axlimx(1)~=axlimx(2)
-                            gridLines(fid, grouplabel, axpos, x, y, scolorname, gridlinestyle, linewidth, axlimx, axxtick, axxindex_inner, selectedCorners, [2 3 4 5])
+                            gridLines(fid, grouplabel, axpos, x, y, scolorname, gridlinestyle, linewidth, axlimx, axxtick, axxindex_inner, selectedCorners, [2 3 4 5], gridAlpha)
                             if strcmp(get(ax,'XTickMode'),'auto') && strcmp(get(ax,'XMinorGrid'),'on') && ~isempty(minor_axxtick)
-                                minorGridLines(fid, grouplabel, axpos, x, y, scolorname, minor_gridlinestyle, linewidth, axlimx, minor_axxtick, selectedCorners, [2 3 4 5])                                
+                                minorGridLines(fid, grouplabel, axpos, x, y, scolorname, minor_gridlinestyle, linewidth, axlimx, minor_axxtick, selectedCorners, [2 3 4 5], minorGridAlpha)                                
                             end
                         end
                     end
@@ -1037,12 +1063,21 @@ if strcmp(get(ax,'Visible'),'on')
                     end
                 case 2 % y
                     % Draw y-grid
-                    scolorname = searchcolor(id,get(ax,'YColor'));
+                    if verLessThan('matlab', '8.4.0')
+                        scolorname = get(ax, 'YColor');
+                    else
+                        if strcmp(get(ax, 'GridColorMode'), 'auto')
+                            scolorname = get(ax, 'YColor');
+                        else
+                            scolorname = get(ax, 'GridColor');
+                        end
+                    end
+                    scolorname = searchcolor(id,scolorname);
                     if strcmp(get(ax,'YGrid'),'on') && gridBehind
                         if axlimy(1)~=axlimy(2)
-                            gridLines(fid, grouplabel, axpos, x, y, scolorname, gridlinestyle, linewidth, axlimy, axytick, axyindex_inner, selectedCorners, [2 3 4 5])
+                            gridLines(fid, grouplabel, axpos, x, y, scolorname, gridlinestyle, linewidth, axlimy, axytick, axyindex_inner, selectedCorners, [2 3 4 5], gridAlpha)
                             if strcmp(get(ax,'YTickMode'),'auto') && strcmp(get(ax,'YMinorGrid'),'on') && ~isempty(minor_axytick)
-                                minorGridLines(fid, grouplabel, axpos, x, y, scolorname, minor_gridlinestyle, linewidth, axlimy, minor_axytick, selectedCorners, [2 3 4 5])                                                                
+                                minorGridLines(fid, grouplabel, axpos, x, y, scolorname, minor_gridlinestyle, linewidth, axlimy, minor_axytick, selectedCorners, [2 3 4 5], minorGridAlpha)                                                                
                             end
                         end
                     end
@@ -1059,12 +1094,21 @@ if strcmp(get(ax,'Visible'),'on')
                     end
                 case 3 % z
                     % Draw z-grid
-                    scolorname = searchcolor(id,get(ax,'ZColor'));
+                    if verLessThan('matlab', '8.4.0')
+                        scolorname = get(ax, 'ZColor');
+                    else
+                        if strcmp(get(ax, 'GridColorMode'), 'auto')
+                            scolorname = get(ax, 'ZColor');
+                        else
+                            scolorname = get(ax, 'GridColor');
+                        end
+                    end
+                    scolorname = searchcolor(id,scolorname);
                     if strcmp(get(ax,'ZGrid'),'on') && gridBehind
                         if axlimz(1)~=axlimz(2)
-                            gridLines(fid, grouplabel, axpos, x, y, scolorname, gridlinestyle, linewidth, axlimz, axztick, axzindex_inner, selectedCorners, [2 3 4 5])
+                            gridLines(fid, grouplabel, axpos, x, y, scolorname, gridlinestyle, linewidth, axlimz, axztick, axzindex_inner, selectedCorners, [2 3 4 5], gridAlpha)
                             if strcmp(get(ax,'ZTickMode'),'auto') && strcmp(get(ax,'ZMinorGrid'),'on') && ~isempty(minor_axztick)
-                                minorGridLines(fid, grouplabel, axpos, x, y, scolorname, minor_gridlinestyle, linewidth, axlimz, minor_axztick, selectedCorners, [2 3 4 5])                                                                
+                                minorGridLines(fid, grouplabel, axpos, x, y, scolorname, minor_gridlinestyle, linewidth, axlimz, minor_axztick, selectedCorners, [2 3 4 5], minorGridAlpha)                                                                
                             end
                         end
                     end
@@ -2354,8 +2398,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create a line segment
 % this algorthm was optimized for large segement counts
-function line2svg(fid, group, axpos, x, y, scolorname, style, width)
+function line2svg(fid, ~, ~, x, y, scolorname, style, width, strokeopacity)
 SEG_SIZE = 5000;
+if nargin < 9 || ~isscalar(strokeopacity)
+    strokeopacity = 1;
+end
 if ~strcmp(style,'none')
     pattern = lineStyle2svg(style, width);
    
@@ -2381,7 +2428,7 @@ if ~strcmp(style,'none')
     for j=1:numel(start_pts)
         xx=x(start_pts(j):end_pts(j));
         yy=y(start_pts(j):end_pts(j));
-        fprintf(fid,'      <polyline fill="none" stroke="%s" stroke-width="%0.1fpt" %s points="', scolorname, width, pattern);
+        fprintf(fid,'      <polyline fill="none" stroke="%s" stroke-width="%0.1fpt" %s stroke-opacity="%0.2f" points="', scolorname, width, pattern, strokeopacity);
         fprintf(fid,'%0.5f,%0.5f ',[xx;yy]);
         fprintf(fid,'"/>\n');
     end
