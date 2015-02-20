@@ -136,6 +136,9 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               specified infinite limits
 %  19-02-2015 - Added bug fix for when ticks are specified outside the plot
 %               window
+%  19-02-2015 - Bug fix for log scale minor ticks not showing above the
+%               largest power of 10. Inspired by Valentin, but used a
+%               simpler solution
 
 global PLOT2SVG_globals
 global colorname
@@ -987,7 +990,7 @@ if strcmp(get(ax,'Visible'),'on')
         axxtick = log10(get(ax,'XTick'));
         minor_axxtick = [];
         if ~isempty(axxtick)
-            all_axxtick = axxtick(1):1:axxtick(end); 
+            all_axxtick = axxtick(1):1:(axxtick(end) + 1); 
             for stick = all_axxtick
                 minor_axxtick = [minor_axxtick minor_log_sticks + stick]; 
             end
@@ -998,7 +1001,7 @@ if strcmp(get(ax,'Visible'),'on')
         axytick=log10(get(ax,'YTick'));
         minor_axytick = [];
         if ~isempty(axytick)
-            all_axytick = axytick(1):1:axytick(end); 
+            all_axytick = axytick(1):1:(axytick(end) + 1); 
             for stick = all_axytick
                 minor_axytick = [minor_axytick minor_log_sticks + stick]; 
             end
@@ -1009,7 +1012,7 @@ if strcmp(get(ax,'Visible'),'on')
         axztick=log10(get(ax,'ZTick'));
         minor_axztick = [];
         if ~isempty(axztick)
-            all_axztick = axztick(1):1:axztick(end); 
+            all_axztick = axztick(1):1:(axztick(end) + 1); 
             for stick = all_axztick
                 minor_axztick = [minor_axztick minor_log_sticks + stick]; 
             end
