@@ -109,7 +109,6 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %  18-07-2013 - Small fix to exclude change log from help
 %               (thanks to Stuart Layton)
 %  30-11-2014 - Preliminary partial support for contour objects
-
 % Edits made by Jonathon Harding
 %  18-02-2015 - Removed calls to `find` inside variable indexes, as these
 %               are not necessary for MATLAB
@@ -139,10 +138,17 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %  19-02-2015 - Bug fix for log scale minor ticks not showing above the
 %               largest power of 10. Inspired by Valentin, but used a
 %               simpler solution
+% Edits made by Juerg Schwizer
+%  14-05-2015 - Reworked fix for ticks specified outside the plot window
+%             - Added css property image-rendering: pixelated;
+%             - Removed type 'image' from AxesChildBounds() as it triggers
+%               an error under Matlab 2010.
+
+
 
 global PLOT2SVG_globals
 global colorname
-progversion='16-Feb-2013';
+progversion='14-May-2015';
 PLOT2SVG_globals.runningIdNumber = 0;
 PLOT2SVG_globals.octave = false;
 PLOT2SVG_globals.checkUserData = true;
@@ -2195,7 +2201,7 @@ for i=length(axchild):-1:1
                 % Workaround for Inkscape filter bug
                 fprintf(fid,'<rect x="%0.3f" y="%0.3f" width="%0.3f" height="%0.3f" fill="none" stroke="none" />\n', boundingBox(1), boundingBox(2), boundingBox(3), boundingBox(4));
             end
-            fprintf(fid,'<image x="%0.3f" y="%0.3f" width="%0.3f" height="%0.3f" image-rendering="optimizeSpeed" preserveAspectRatio="none" xlink:href="%s" />\n', pointsx, pointsy, lx, ly, filename);
+            fprintf(fid,'<image x="%0.3f" y="%0.3f" width="%0.3f" height="%0.3f" style="image-rendering: pixelated;" image-rendering="optimizeSpeed" preserveAspectRatio="none" xlink:href="%s" />\n', pointsx, pointsy, lx, ly, filename);
             fprintf(fid,'</g>\n');
         else
             fprintf(fid,'<g id="%s" %s>\n', createId, filterString);
@@ -2203,7 +2209,7 @@ for i=length(axchild):-1:1
                 % Workaround for Inkscape filter bug
                 fprintf(fid,'<rect x="%0.3f" y="%0.3f" width="%0.3f" height="%0.3f" fill="none" stroke="none" />\n', boundingBox(1), boundingBox(2), boundingBox(3), boundingBox(4));
             end
-            fprintf(fid,'<image x="%0.3f" y="%0.3f" width="%0.3f" height="%0.3f" image-rendering="optimizeSpeed" preserveAspectRatio="none" xlink:href="%s" />\n', pointsx, pointsy, lx, ly, filename);
+            fprintf(fid,'<image x="%0.3f" y="%0.3f" width="%0.3f" height="%0.3f" style="image-rendering: pixelated;" image-rendering="optimizeSpeed" preserveAspectRatio="none" xlink:href="%s" />\n', pointsx, pointsy, lx, ly, filename);
             fprintf(fid,'</g>\n');
         end
     elseif strcmp(get(axchild(i),'Type'), 'hggroup')
@@ -2595,9 +2601,12 @@ if strcmp(get(ax,'XTickLabelMode'),'auto') && strcmp(get(ax,'XScale'),'linear')
     numlabels = numlabels(:);
     labelpos = labelpos(:);
     indexnz = find(labelpos ~= 0);
-    indexnz(indexnz > numel(numlabels)) = [];
     if (~isempty(indexnz) && ~isempty(numlabels))
-        ratio=numlabels(indexnz)./labelpos(indexnz);
+        if (length(indexnz) == length(numlabels) && max(indexnz) <= length(numlabels))
+            ratio = numlabels(indexnz)./labelpos(indexnz);
+        else
+            ratio = 1;
+        end
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
             exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
             label2svg(fid,group,axpos,ax,(axpos(1)+axpos(3))*paperpos(3),(1-axpos(2))*paperpos(4)+3*fontsize,exptext,'right',0,'top',1,paperpos,font_color,0)           
@@ -2624,9 +2633,12 @@ if strcmp(get(ax,'YTickLabelMode'),'auto') && strcmp(get(ax,'YScale'),'linear')
     numlabels = numlabels(:);
     labelpos = labelpos(:);
     indexnz = find(labelpos ~= 0);
-    indexnz(indexnz > numel(numlabels)) = [];
     if (~isempty(indexnz) && ~isempty(numlabels))
-        ratio = numlabels(indexnz)./labelpos(indexnz);
+        if (length(indexnz) == length(numlabels) && max(indexnz) <= length(numlabels))
+            ratio = numlabels(indexnz)./labelpos(indexnz);
+        else
+            ratio = 1;
+        end	
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
             exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
             label2svg(fid,group,axpos,ax,axpos(1)*paperpos(3),(1-(axpos(2)+axpos(4)))*paperpos(4)-0.5*fontsize,exptext,'left',0,'bottom',1,paperpos,font_color,0)           
@@ -2653,9 +2665,12 @@ if strcmp(get(ax,'ZTickLabelMode'),'auto') && strcmp(get(ax,'ZScale'),'linear')
     numlabels = numlabels(:);
     labelpos = labelpos(:);
     indexnz = find(labelpos ~= 0);
-    indexnz(indexnz > numel(numlabels)) = [];
     if (~isempty(indexnz) && ~isempty(numlabels))
-        ratio = numlabels(indexnz)./labelpos(indexnz);
+        if (length(indexnz) == length(numlabels) && max(indexnz) <= length(numlabels))
+            ratio = numlabels(indexnz)./labelpos(indexnz);
+        else
+            ratio = 1;
+        end
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
             exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
             label2svg(fid,group,axpos,ax,axpos(1)*paperpos(3),(1-(axpos(2)+axpos(4)))*paperpos(4)-0.5*fontsize,exptext,'left',0,'top',1,paperpos,font_color,0)           
@@ -3330,7 +3345,7 @@ function [xlims, ylims, zlims] = AxesChildBounds(ax)
     % old style legends)
     children = findobj(ax, '-depth', 1, '-not', 'Type', 'axes');
     % Now get all children of those objects that have data we can analyze
-    dataObjs = findobj(children, 'Type', 'image', '-or', 'Type', 'line', ...
+    dataObjs = findobj(children, 'Type', 'line', ...
         '-or', 'Type', 'patch', '-or', 'Type', 'Rectangle', '-or', 'Type', 'Surface');
     % Generate default limits if no objects are found
     xlims = [0 1];
