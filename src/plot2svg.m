@@ -145,6 +145,7 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               an error under Matlab 2010.
 %  14-05-2015 - Reverted part of the text rendering of 19-02-2015 as it
 %               failed to handle exponents.
+%  14-05-2015 - Removed undefined variable which was obsolete
 
 
 
@@ -2898,7 +2899,7 @@ if ~isempty(StringText)
     else
         if isempty(bracket)
             if any(StringText == '^' | StringText == '_' | StringText == '\' )
-                returnvalue = ['<tspan>' singleLatex2svg(StringText, size) '</tspan>'];    
+                returnvalue = ['<tspan>' singleLatex2svg(StringText) '</tspan>'];    
                 % Clean up empty tspan elements
                 % More could be done here, but with huge effort to make it
                 % match all special cases.
@@ -2959,7 +2960,7 @@ catch ME
     fprintf(['Warning: Error ''' errStr ''' occurred during conversion. Latex string ''' StringText ''' will not be converted.\n']);
 end
 
-function StringText = singleLatex2svg(StringText, size)
+function StringText = singleLatex2svg(StringText)
 index = find(StringText == '_' | StringText == '^');
 if ~isempty(index)
     if index(end) == length(StringText)
@@ -2974,8 +2975,6 @@ if ~isempty(index)
                     '</tspan>' ...
                     StringText(index(i)+2:end)];
         else
-            localOffset = 0.5 * size;
-            localSize = 0.7 * size;
             StringText = [StringText(1:index(i)-1) ...
                     '<tspan style="baseline-shift:super;font-size:65%%">' ...
                     StringText(index(i)+1) ...
