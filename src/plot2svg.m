@@ -157,6 +157,10 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               graphics.)
 %               The relative position of the overlay image must be set with
 %               OverlayImagePos = [x, y, width, height].
+%  04-07-2015 - Merged support for rescaling of patches with PatchRescale
+%               (gouraud not supported, yet). This is necessary, to create
+%               overlap of patches in 3D plots, because some viewers show
+%               white gaps if the patches don't overlap.
 
 
 
@@ -169,6 +173,7 @@ PLOT2SVG_globals.LatexPassOn = false;
 PLOT2SVG_globals.GlobalScale = 1;
 PLOT2SVG_globals.OverlayImage = '';
 PLOT2SVG_globals.OverlayImagePos = [0, 0, 1, 1];
+PLOT2SVG_globals.PatchRescale = 1;
 PLOT2SVG_globals.checkUserData = true;
 PLOT2SVG_globals.ScreenPixelsPerInch = 90; % Default 90ppi
 try
@@ -279,6 +284,9 @@ if PLOT2SVG_globals.checkUserData && isstruct(get(id,'UserData'))
         end
         if isfield(struct_data.svg,'OverlayImagePos')
             PLOT2SVG_globals.OverlayImagePos = struct_data.svg.OverlayImagePos;
+        end
+        if isfield(struct_data.svg,'PatchRescale')
+            PLOT2SVG_globals.PatchRescale = struct_data.svg.PatchRescale;
         end
     end
 end
@@ -2332,6 +2340,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create a patch (filled area)
 function patch2svg(fid,group,axpos,xtot,ytot,scolorname,style,width, edgecolorname, face_opacity, edge_opacity, closed)
+global PLOT2SVG_globals
+
 if closed
     type = 'polygon';
 else
@@ -2348,6 +2358,24 @@ for i = 1:size(xtot, 1)
         for j = 1:20000:length(x)
             xx = x(j:min(length(x), j + 19999));
             yy = y(j:min(length(y), j + 19999));
+            
+            % Scale patch around its center point.
+            % Calculate center point
+            cx = mean(xx);
+            cy = mean(yy);
+            
+            % Move to origin
+            xx = xx - cx;
+            yy = yy - cy;
+            
+            % Scale up
+            xx = xx*PLOT2SVG_globals.PatchRescale;
+            yy = yy*PLOT2SVG_globals.PatchRescale;
+            
+            % Move back to position
+            xx = xx + cx;
+            yy = yy + cy;
+            
             if ~strcmp(edgecolorname,'none') || ~strcmp(scolorname,'none')
                 fprintf(fid,'      <%s fill="%s" fill-opacity="%0.2f" stroke="%s" stroke-width="%0.1fpt" stroke-opacity="%0.2f" %s points="',...
                     type, scolorname, face_opacity, edgecolorname, width, edge_opacity, pattern);
@@ -2366,6 +2394,24 @@ for i = 1:size(xtot, 1)
         for j = 1:(length(parts) - 1)
             xx = x((parts(j)+1):(parts(j+1)-1));
             yy = y((parts(j)+1):(parts(j+1)-1));
+            
+            % Scale patch around its center point.
+            % Calculate center point
+            cx = mean(xx);
+            cy = mean(yy);
+
+            % Move to origin
+            xx = xx - cx;
+            yy = yy - cy;
+
+            % Scale up
+            xx = xx*PLOT2SVG_globals.PatchRescale;
+            yy = yy*PLOT2SVG_globals.PatchRescale;
+
+            % Move back to position
+            xx = xx + cx;
+            yy = yy + cy;
+            
             if ~strcmp(edgecolorname,'none') || ~strcmp(scolorname,'none')
                 if ~isempty(xx)
                     fprintf(fid,'      <%s fill="%s" fill-opacity="%0.2f" stroke="%s" stroke-width="%0.1fpt" stroke-opacity="%0.2f" %s points="',...
