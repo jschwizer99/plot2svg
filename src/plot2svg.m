@@ -149,6 +149,15 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 % Edit by Thomas Wiesner
 %  04-07-2015 - Merge of LatexPassOn option.
 %  04-07-2015 - Merge of GlobalScale option.
+%  04-07-2015 - Merge of overlay image function.
+%               A pixel image can now be placed on top of the plot using
+%               OverlayImage. This is useful, if you want to export some
+%               parts of the plot as pixel data (e.g. for 3D surface plots
+%               which can be extremely time consuming to export as vector
+%               graphics.)
+%               The relative position of the overlay image must be set with
+%               OverlayImagePos = [x, y, width, height].
+
 
 
 global PLOT2SVG_globals
@@ -158,6 +167,8 @@ PLOT2SVG_globals.runningIdNumber = 0;
 PLOT2SVG_globals.octave = false;
 PLOT2SVG_globals.LatexPassOn = false;
 PLOT2SVG_globals.GlobalScale = 1;
+PLOT2SVG_globals.OverlayImage = '';
+PLOT2SVG_globals.OverlayImagePos = [0, 0, 1, 1];
 PLOT2SVG_globals.checkUserData = true;
 PLOT2SVG_globals.ScreenPixelsPerInch = 90; % Default 90ppi
 try
@@ -258,6 +269,17 @@ if PLOT2SVG_globals.checkUserData && isstruct(get(id,'UserData'))
         if isfield(struct_data.svg,'GlobalScale')
             PLOT2SVG_globals.GlobalScale = struct_data.svg.GlobalScale;
         end
+        if isfield(struct_data.svg,'OverlayImage')
+            PLOT2SVG_globals.OverlayImage = struct_data.svg.OverlayImage;
+            
+            if ~isfield(struct_data.svg,'OverlayImagePos')
+                disp('   Warning: OverlayImage option and no OverlayImagePos given.');
+                disp('            Image will be scaled across whole plot.');
+            end
+        end
+        if isfield(struct_data.svg,'OverlayImagePos')
+            PLOT2SVG_globals.OverlayImagePos = struct_data.svg.OverlayImagePos;
+        end
     end
 end
 
@@ -318,6 +340,10 @@ for j=length(ax):-1:1
     else
         disp(['   Warning: Unhandled main figure child type: ' currenttype]);
     end
+end
+if ~isempty(PLOT2SVG_globals.OverlayImage)
+    oip = PLOT2SVG_globals.OverlayImagePos;
+    fprintf(fid,'  <image x="%0.3f" y="%0.3f" width="%0.3f" height="%0.3f" image-rendering="optimizeSpeed" preserveAspectRatio="none" xlink:href="%s" />\n',paperpos(3)*oip(1),paperpos(4)*oip(2),paperpos(3)*oip(3),paperpos(4)*oip(4), PLOT2SVG_globals.OverlayImage);
 end
 fprintf(fid,'  </g>\n');
 fprintf(fid,'</svg>\n');
