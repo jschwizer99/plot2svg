@@ -148,6 +148,7 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %  14-05-2015 - Removed undefined variable which was obsolete
 % Edit by Thomas Wiesner
 %  04-07-2015 - Merge of LatexPassOn option.
+%  04-07-2015 - Merge of GlobalScale option.
 
 
 global PLOT2SVG_globals
@@ -156,6 +157,7 @@ progversion='14-May-2015';
 PLOT2SVG_globals.runningIdNumber = 0;
 PLOT2SVG_globals.octave = false;
 PLOT2SVG_globals.LatexPassOn = false;
+PLOT2SVG_globals.GlobalScale = 1;
 PLOT2SVG_globals.checkUserData = true;
 PLOT2SVG_globals.ScreenPixelsPerInch = 90; % Default 90ppi
 try
@@ -253,6 +255,9 @@ if PLOT2SVG_globals.checkUserData && isstruct(get(id,'UserData'))
         if isfield(struct_data.svg,'LatexPassOn')
             PLOT2SVG_globals.LatexPassOn = struct_data.svg.LatexPassOn;
         end
+        if isfield(struct_data.svg,'GlobalScale')
+            PLOT2SVG_globals.GlobalScale = struct_data.svg.GlobalScale;
+        end
     end
 end
 
@@ -265,13 +270,17 @@ PLOT2SVG_globals.basefilename = name;
 PLOT2SVG_globals.figurenumber = 1;
 fid=fopen(finalname,'wt');   % Create a new text file
 fprintf(fid,'<?xml version="1.0" encoding="utf-8" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n');    % Insert file header
-fprintf(fid,'<svg preserveAspectRatio="xMinYMin meet" width="100%%" height="100%%" viewBox="0 0 %0.3f %0.3f" ',paperpos(3),paperpos(4));
+fprintf(fid,'<svg preserveAspectRatio="xMinYMin meet" width="100%%" height="100%%" viewBox="0 0 %0.3f %0.3f" ',paperpos(3)*PLOT2SVG_globals.GlobalScale,paperpos(4)*PLOT2SVG_globals.GlobalScale);
 fprintf(fid,' version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"');
 %fprintf(fid,' onload="Init(evt)"');
 fprintf(fid,'>\n');
 fprintf(fid,'  <desc>Matlab Figure Converted by PLOT2SVG written by Juerg Schwizer</desc>\n');
 %fprintf(fid,'  <script type="text/ecmascript" xlink:href="puzzle_script.js" />\n');
-fprintf(fid,'  <g id="topgroup">\n');
+if PLOT2SVG_globals.GlobalScale == 1
+    fprintf(fid,'  <g id="topgroup">\n');
+else
+    fprintf(fid,'  <g id="topgroup" transform="scale(%f)">\n', PLOT2SVG_globals.GlobalScale);
+end
 group=1;
 groups=[];
 % Frame of figure
