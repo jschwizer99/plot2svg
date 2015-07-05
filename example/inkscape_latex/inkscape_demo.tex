@@ -1,0 +1,28 @@
+\documentclass[a4paper]{article}
+\usepackage{graphicx}
+%\usepackage{showframe}
+\usepackage{geometry}
+\usepackage{color}
+\usepackage{subfig}
+
+\geometry{a4paper, portrait, left=1.5cm, right=1.5cm, top=1.5cm, bottom=1.5cm, includefoot, includehead}
+
+\newcommand{\includesvg}[1]{\input{#1.pdf_tex}}
+\newcommand{\includesvgfn}[1]{\footnotesize\input{#1.pdf_tex}}
+
+\begin{document}
+\pagestyle{empty}
+\begin{figure}
+	\centering
+	\includesvg{demo_graphics}
+	\caption{Demo for including graphics using \texttt{plot2svg} and \texttt{inkscape}.}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\hfill\subfloat[Smaller graphics with default font size.]{\includesvg{demo_graphics_smaller}}\hfill\hfill
+	\subfloat[Smaller graphics with smaller font size.]{\includesvgfn{demo_graphics_smaller}}\hspace*{\fill}
+	\caption{Since all \LaTeX{} code is overlaid during the document compile pass, the font size can be set in the main document.}
+\end{figure}
+
+\end{document}
