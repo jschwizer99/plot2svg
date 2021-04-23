@@ -2,24 +2,7 @@ Scalable Vector Graphics (SVG) Export of Figures
 
 Converts 2D & 3D Matlab plots to the scalable vector format (SVG). This format is specified by W3C (http://www.w3.org) and can be viewed and printed with internet browsers.
 
-Added preliminary support of filter, clipping, and tickmark extensions that go beyond the Matlab functionality. SVG filters are a great tool to create stylish plots! Try it out! Before you start using this new features have a look at the tutorial. More information and examples can be found on my blog http://www.zhinst.com/blogs/schwizer/.
-
-Tested browsers and editors for basic SVG support (no filters, no animation):
-  Opera 9.64, 10.50, 10.63  -> yes
-  Firefox 3.5, 3.6, 12.0, 15.0 -> yes
-  Inkscape 0.46, 0.47, 0.48 -> yes
-  Chrome 8.0, 18.0, 21.0 -> yes
-  Internet Explorer 9.0 beta -> yes
-  Internet Explorer 8.0 -> no
-  Internet Explorer + RENESIS -> yes
-
-Tested browsers and editors for SVG filters:
-  Opera 9.64, 10.50, 10.63  -> yes
-  Firefox 3.5, 3.6, 12.0, 15.0 -> yes
-  Inkscape 0.46, 0.47, 0.48 -> yes (some limitations)
-  Chrome 8.0, 18.0, 21.0 -> yes
-  Internet Explorer 8.0, 9.0 beta -> no
-  Internet Explorer + RENESIS -> no
+Added preliminary support of filter, clipping, and tickmark extensions that go beyond the Matlab functionality. SVG filters are a great tool to create stylish plots! Try it out! Before you start using this new features have a look at the tutorial.
 
 Editors for the SVG file format can be found at http://www.inkscape.org.
 
@@ -29,8 +12,6 @@ Usage:
 > plot2svg('myfile.svg', figure handle, pixelfiletype)
     
   pixelfiletype = 'png' (default), 'jpg'         
-
-See http://www.zhinst.com/blogs/schwizer/ to get more informations
 
 Supported Features
 - line, patch, contour, contourf, quiver, surf, ...
@@ -82,7 +63,7 @@ Changes in Version 8-Jan-2006
 - linear color interpolation on patches (The interploation needs to be emulated as SVG does not support a linear interpolation of colors between three points. This is done by combination of different patches with linear alpha gradients. See limitation for Firefox 1.5.)
 
 Changes in Version 20-Jun-2009
-- Bugfix '°','±','µ','²','³','¼''½','¾','©''®'
+- Bugfix 'Â°','Â±','Âµ','Â²','Â³','Â¼''Â½','Â¾','Â©''Â®'
 - Bugfix 'projection' in hggroup and hgtransform
 - Added Octave functionality (thanks to Jakob Malm)
   Bugfixe cdatamapping (thanks to Tom)
@@ -165,8 +146,8 @@ Changes in Version 10-11-2010
 Changes in Version 25-08-2011
 - Fix for degree character (thanks to Manes Recheis)
 - Fix for problems with dash-arrays in Inkscape (thanks to
-  Rüdiger Stirnberg)
-- Modified shape of driangles (thanks to Rüdiger Stirnberg)
+  RÃ¼diger Stirnberg)
+- Modified shape of driangles (thanks to RÃ¼diger Stirnberg)
 
 Changes in Version 22-10-2011
 - Removed versn as return value of function fileparts (thanks
