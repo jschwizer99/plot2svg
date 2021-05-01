@@ -1437,7 +1437,7 @@ global PLOT2SVG_globals
 for i=length(axchild):-1:1
     if strcmp(get(axchild(i), 'Visible'), 'off')
         % do nothing
-    elseif strcmp(get(axchild(i),'Type'),'line')
+    elseif strcmp(get(axchild(i),'Type'),'line') || strcmp(get(axchild(i),'Type'),'parameterizedfunctionline')
         scolorname=searchcolor(id,get(axchild(i),'Color'));
         linestyle=get(axchild(i),'LineStyle');
         linewidth=get(axchild(i),'LineWidth');
@@ -3344,7 +3344,7 @@ function [xlims, ylims, zlims] = AxesChildBounds(ax)
     % old style legends)
     children = findobj(ax, '-depth', 1, '-not', 'Type', 'axes');
     % Now get all children of those objects that have data we can analyze
-    dataObjs = findobj(children, 'Type', 'line', ...
+    dataObjs = findobj(children, 'Type', 'line', 'parameterizedfunctionline', ...
         '-or', 'Type', 'patch', '-or', 'Type', 'Rectangle', '-or', 'Type', 'Surface');
     % Generate default limits if no objects are found
     xlims = [0 1];
