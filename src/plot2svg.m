@@ -29,7 +29,7 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %               Clipping
 %               Minor tick marks
 %  22.01.2005 - Removed unused 'end'
-%  29.10.2006 - Bugfix '°','±','µ','²','³','¼''½','¾','©''®'
+%  29.10.2006 - Bugfix '','','','','','''','',''''
 %  17-04-2007 - Bugfix 'projection' in hggroup and hgtransform
 %  27-01-2008 - Added Octave functionality (thanks to Jakob Malm)
 %               Bugfixe cdatamapping (thanks to Tom)
@@ -90,8 +90,8 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %             - Tiny optimization of the grid display at axis borders
 %  25-08-2011 - Fix for degree character (thanks to Manes Recheis)
 %             - Fix for problems with dash-arrays in Inkscape (thanks to
-%               Rüdiger Stirnberg)
-%             - Modified shape of driangles (thanks to Rüdiger Stirnberg)
+%               Rdiger Stirnberg)
+%             - Modified shape of driangles (thanks to Rdiger Stirnberg)
 %  22-10-2011 - Removed versn as return value of function fileparts (thanks
 %               to Andrew Scott)
 %             - Fix for images (thanks to Roeland)
@@ -146,6 +146,21 @@ function varargout = plot2svg(param1,id,pixelfiletype)
 %  14-05-2015 - Reverted part of the text rendering of 19-02-2015 as it
 %               failed to handle exponents.
 %  14-05-2015 - Removed undefined variable which was obsolete
+% Edit by Thomas Wiesner
+%  04-07-2015 - Merge of LatexPassOn option.
+%  04-07-2015 - Merge of GlobalScale option.
+%  04-07-2015 - Merge of overlay image function.
+%               A pixel image can now be placed on top of the plot using
+%               OverlayImage. This is useful, if you want to export some
+%               parts of the plot as pixel data (e.g. for 3D surface plots
+%               which can be extremely time consuming to export as vector
+%               graphics.)
+%               The relative position of the overlay image must be set with
+%               OverlayImagePos = [x, y, width, height].
+%  04-07-2015 - Merged support for rescaling of patches with PatchRescale
+%               (gouraud not supported, yet). This is necessary, to create
+%               overlap of patches in 3D plots, because some viewers show
+%               white gaps if the patches don't overlap.
 
 
 
@@ -154,6 +169,11 @@ global colorname
 progversion='14-May-2015';
 PLOT2SVG_globals.runningIdNumber = 0;
 PLOT2SVG_globals.octave = false;
+PLOT2SVG_globals.LatexPassOn = false;
+PLOT2SVG_globals.GlobalScale = 1;
+PLOT2SVG_globals.OverlayImage = '';
+PLOT2SVG_globals.OverlayImagePos = [0, 0, 1, 1];
+PLOT2SVG_globals.PatchRescale = 1;
 PLOT2SVG_globals.checkUserData = true;
 PLOT2SVG_globals.ScreenPixelsPerInch = 90; % Default 90ppi
 try
@@ -245,6 +265,33 @@ for i=1:size(cmap,1)
     colorname(i,:)=sprintf('%02x%02x%02x',fix(cmap(i,1)*255),fix(cmap(i,2)*255),fix(cmap(i,3)*255));
 end
 
+if PLOT2SVG_globals.checkUserData && isstruct(get(id,'UserData'))
+    struct_data = get(id,'UserData');
+    if isfield(struct_data,'svg')
+        if isfield(struct_data.svg,'LatexPassOn')
+            PLOT2SVG_globals.LatexPassOn = struct_data.svg.LatexPassOn;
+        end
+        if isfield(struct_data.svg,'GlobalScale')
+            PLOT2SVG_globals.GlobalScale = struct_data.svg.GlobalScale;
+        end
+        if isfield(struct_data.svg,'OverlayImage')
+            PLOT2SVG_globals.OverlayImage = struct_data.svg.OverlayImage;
+            
+            if ~isfield(struct_data.svg,'OverlayImagePos')
+                disp('   Warning: OverlayImage option and no OverlayImagePos given.');
+                disp('            Image will be scaled across whole plot.');
+            end
+        end
+        if isfield(struct_data.svg,'OverlayImagePos')
+            PLOT2SVG_globals.OverlayImagePos = struct_data.svg.OverlayImagePos;
+        end
+        if isfield(struct_data.svg,'PatchRescale')
+            PLOT2SVG_globals.PatchRescale = struct_data.svg.PatchRescale;
+        end
+    end
+end
+
+
 % Open SVG-file
 [pathstr,name] = fileparts(finalname);
 %PLOT2SVG_globals.basefilename = fullfile(pathstr,name);
@@ -253,13 +300,17 @@ PLOT2SVG_globals.basefilename = name;
 PLOT2SVG_globals.figurenumber = 1;
 fid=fopen(finalname,'wt');   % Create a new text file
 fprintf(fid,'<?xml version="1.0" encoding="utf-8" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n');    % Insert file header
-fprintf(fid,'<svg preserveAspectRatio="xMinYMin meet" width="100%%" height="100%%" viewBox="0 0 %0.3f %0.3f" ',paperpos(3),paperpos(4));
+fprintf(fid,'<svg preserveAspectRatio="xMinYMin meet" width="100%%" height="100%%" viewBox="0 0 %0.3f %0.3f" ',paperpos(3)*PLOT2SVG_globals.GlobalScale,paperpos(4)*PLOT2SVG_globals.GlobalScale);
 fprintf(fid,' version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"');
 %fprintf(fid,' onload="Init(evt)"');
 fprintf(fid,'>\n');
 fprintf(fid,'  <desc>Matlab Figure Converted by PLOT2SVG written by Juerg Schwizer</desc>\n');
 %fprintf(fid,'  <script type="text/ecmascript" xlink:href="puzzle_script.js" />\n');
-fprintf(fid,'  <g id="topgroup">\n');
+if PLOT2SVG_globals.GlobalScale == 1
+    fprintf(fid,'  <g id="topgroup">\n');
+else
+    fprintf(fid,'  <g id="topgroup" transform="scale(%f)">\n', PLOT2SVG_globals.GlobalScale);
+end
 group=1;
 groups=[];
 % Frame of figure
@@ -297,6 +348,10 @@ for j=length(ax):-1:1
     else
         disp(['   Warning: Unhandled main figure child type: ' currenttype]);
     end
+end
+if ~isempty(PLOT2SVG_globals.OverlayImage)
+    oip = PLOT2SVG_globals.OverlayImagePos;
+    fprintf(fid,'  <image x="%0.3f" y="%0.3f" width="%0.3f" height="%0.3f" image-rendering="optimizeSpeed" preserveAspectRatio="none" xlink:href="%s" />\n',paperpos(3)*oip(1),paperpos(4)*oip(2),paperpos(3)*oip(3),paperpos(4)*oip(4), PLOT2SVG_globals.OverlayImage);
 end
 fprintf(fid,'  </g>\n');
 fprintf(fid,'</svg>\n');
@@ -2285,6 +2340,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create a patch (filled area)
 function patch2svg(fid,group,axpos,xtot,ytot,scolorname,style,width, edgecolorname, face_opacity, edge_opacity, closed)
+global PLOT2SVG_globals
+
 if closed
     type = 'polygon';
 else
@@ -2301,6 +2358,24 @@ for i = 1:size(xtot, 1)
         for j = 1:20000:length(x)
             xx = x(j:min(length(x), j + 19999));
             yy = y(j:min(length(y), j + 19999));
+            
+            % Scale patch around its center point.
+            % Calculate center point
+            cx = mean(xx);
+            cy = mean(yy);
+            
+            % Move to origin
+            xx = xx - cx;
+            yy = yy - cy;
+            
+            % Scale up
+            xx = xx*PLOT2SVG_globals.PatchRescale;
+            yy = yy*PLOT2SVG_globals.PatchRescale;
+            
+            % Move back to position
+            xx = xx + cx;
+            yy = yy + cy;
+            
             if ~strcmp(edgecolorname,'none') || ~strcmp(scolorname,'none')
                 fprintf(fid,'      <%s fill="%s" fill-opacity="%0.2f" stroke="%s" stroke-width="%0.1fpt" stroke-opacity="%0.2f" %s points="',...
                     type, scolorname, face_opacity, edgecolorname, width, edge_opacity, pattern);
@@ -2319,6 +2394,24 @@ for i = 1:size(xtot, 1)
         for j = 1:(length(parts) - 1)
             xx = x((parts(j)+1):(parts(j+1)-1));
             yy = y((parts(j)+1):(parts(j+1)-1));
+            
+            % Scale patch around its center point.
+            % Calculate center point
+            cx = mean(xx);
+            cy = mean(yy);
+
+            % Move to origin
+            xx = xx - cx;
+            yy = yy - cy;
+
+            % Scale up
+            xx = xx*PLOT2SVG_globals.PatchRescale;
+            yy = yy*PLOT2SVG_globals.PatchRescale;
+
+            % Move back to position
+            xx = xx + cx;
+            yy = yy + cy;
+            
             if ~strcmp(edgecolorname,'none') || ~strcmp(scolorname,'none')
                 if ~isempty(xx)
                     fprintf(fid,'      <%s fill="%s" fill-opacity="%0.2f" stroke="%s" stroke-width="%0.1fpt" stroke-opacity="%0.2f" %s points="',...
@@ -2611,7 +2704,11 @@ if strcmp(get(ax,'XTickLabelMode'),'auto') && strcmp(get(ax,'XScale'),'linear')
             ratio = 1;
         end
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
-            exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
+            if ~PLOT2SVG_globals.LatexPassOn
+                exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
+            else
+                exptext = sprintf('$\\times 10^{%g}$',-log10(ratio(1)));
+            end
             label2svg(fid,group,axpos,ax,(axpos(1)+axpos(3))*paperpos(3),(1-axpos(2))*paperpos(4)+3*fontsize,exptext,'right',0,'top',1,paperpos,font_color,0)           
         end
     end
@@ -2643,7 +2740,11 @@ if strcmp(get(ax,'YTickLabelMode'),'auto') && strcmp(get(ax,'YScale'),'linear')
             ratio = 1;
         end	
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
-            exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
+            if ~PLOT2SVG_globals.LatexPassOn
+                exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
+            else
+                exptext = sprintf('$\\times 10^{%g}$',-log10(ratio(1)));
+            end
             label2svg(fid,group,axpos,ax,axpos(1)*paperpos(3),(1-(axpos(2)+axpos(4)))*paperpos(4)-0.5*fontsize,exptext,'left',0,'bottom',1,paperpos,font_color,0)           
         end
     end
@@ -2675,7 +2776,11 @@ if strcmp(get(ax,'ZTickLabelMode'),'auto') && strcmp(get(ax,'ZScale'),'linear')
             ratio = 1;
         end
         if round(log10(ratio(1))) ~= 0 && ratio(1) ~= 0
-            exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
+            if ~PLOT2SVG_globals.LatexPassOn
+                exptext = sprintf('&#215; 10<tspan style="font-size:65%%;baseline-shift:super">%g</tspan>', -log10(ratio(1)));
+            else
+                exptext = sprintf('$\\times 10^{%g}$',-log10(ratio(1)));
+            end
             label2svg(fid,group,axpos,ax,axpos(1)*paperpos(3),(1-(axpos(2)+axpos(4)))*paperpos(4)-0.5*fontsize,exptext,'left',0,'top',1,paperpos,font_color,0)           
         end
     end
@@ -2687,6 +2792,8 @@ end
 % former versions of FrameMaker supported the commands FDY and FDX to shift the text
 % this commands were replaced by a shift parameter that is normed by the font size
 function label2svg(fid,group,axpos,id,x,y,tex,align,angle,valign,lines,paperpos,font_color,exponent)
+global PLOT2SVG_globals
+
 if isempty(tex)
     return;
 end
@@ -2706,6 +2813,9 @@ if isfield(get(id),'Interpreter')
     end
 else
     latex=1;
+end
+if PLOT2SVG_globals.LatexPassOn
+    latex = 0;
 end
 fontsize=convertunit(get(id,'FontSize'),get(id,'FontUnits'),'points', axpos(4));   % convert fontsize to inches
 fontweight = get(id,'FontWeight');
@@ -2866,8 +2976,12 @@ if isempty(tex)
     return;
 end
 if exponent
-    tex=sprintf('10<tspan font-size="%0.1fpt" dy="%0.1fpt">%s</tspan>', 0.7*textfontsize, -0.7*textfontsize, tex);
-    shift = shift + 0.4*fontsize;   % Small correction to make it look nicer
+    if ~PLOT2SVG_globals.LatexPassOn
+        tex = sprintf('10<tspan font-size="%0.1fpt" dy="%0.1fpt">%s</tspan>', 0.7*textfontsize, -0.7*textfontsize, tex);
+        shift = shift + 0.4*fontsize;   % Small correction to make it look nicer
+    else
+        tex = sprintf('$10^{%s}$', tex);
+    end
 end
 % Note: Obviously, Matlab is using font sizes that are rounded to decimal
 % pt sizes. This may cause problems for very small figures. But we have to
@@ -3065,83 +3179,83 @@ if ~isempty(StringText)
     StringText=strrep(StringText,'>','&gt;');
     StringText=strrep(StringText,'"','&quot;');
     % Workaround for Firefox and Inkscape
-    StringText=strrep(StringText,'°','&#176;');
-    %StringText=strrep(StringText,'°','&deg;');
-    StringText=strrep(StringText,'±','&plusmn;');
-    StringText=strrep(StringText,'µ','&micro;');
-    StringText=strrep(StringText,'²','&sup2;');
-    StringText=strrep(StringText,'³','&sup3;');
-    StringText=strrep(StringText,'¼','&frac14;');
-    StringText=strrep(StringText,'½','&frac12;');
-    StringText=strrep(StringText,'¾','&frac34;');
-    StringText=strrep(StringText,'©','&copy;');
-    StringText=strrep(StringText,'®','&reg;');
+    StringText=strrep(StringText,'','&#176;');
+    %StringText=strrep(StringText,'','&deg;');
+    StringText=strrep(StringText,'','&plusmn;');
+    StringText=strrep(StringText,'','&micro;');
+    StringText=strrep(StringText,'','&sup2;');
+    StringText=strrep(StringText,'','&sup3;');
+    StringText=strrep(StringText,'','&frac14;');
+    StringText=strrep(StringText,'','&frac12;');
+    StringText=strrep(StringText,'','&frac34;');
+    StringText=strrep(StringText,'','&copy;');
+    StringText=strrep(StringText,'','&reg;');
     if any(StringText > 190)
-        StringText=strrep(StringText,'¿','&#191;');
-        StringText=strrep(StringText,'À','&#192;');
-        StringText=strrep(StringText,'Á','&#193;');
-        StringText=strrep(StringText,'Â','&#194;');
-        StringText=strrep(StringText,'Ã','&#195;');
-        StringText=strrep(StringText,'Ä','&#196;');
-        StringText=strrep(StringText,'Å','&#197;');
-        StringText=strrep(StringText,'Æ','&#198;');
-        StringText=strrep(StringText,'Ç','&#199;');
-        StringText=strrep(StringText,'È','&#200;');
-        StringText=strrep(StringText,'É','&#201;');
-        StringText=strrep(StringText,'Ê','&#202;');
-        StringText=strrep(StringText,'Ë','&#203;');
-        StringText=strrep(StringText,'Ì','&#204;');
-        StringText=strrep(StringText,'Í','&#205;');
-        StringText=strrep(StringText,'Î','&#206;');
-        StringText=strrep(StringText,'Ï','&#207;');
-        StringText=strrep(StringText,'Ð','&#208;');
-        StringText=strrep(StringText,'Ñ','&#209;');
-        StringText=strrep(StringText,'Ò','&#210;');
-        StringText=strrep(StringText,'Ó','&#211;');
-        StringText=strrep(StringText,'Ô','&#212;');
-        StringText=strrep(StringText,'Õ','&#213;');
-        StringText=strrep(StringText,'Ö','&#214;');
-        StringText=strrep(StringText,'×','&#215;');
-        StringText=strrep(StringText,'Ø','&#216;');
-        StringText=strrep(StringText,'Ù','&#217;');
-        StringText=strrep(StringText,'Ú','&#218;');
-        StringText=strrep(StringText,'Û','&#219;');
-        StringText=strrep(StringText,'Ü','&#220;');
-        StringText=strrep(StringText,'Ý','&#221;');
-        StringText=strrep(StringText,'Þ','&#222;');
-        StringText=strrep(StringText,'ß','&#223;');
-        StringText=strrep(StringText,'à','&#224;');
-        StringText=strrep(StringText,'á','&#225;');
-        StringText=strrep(StringText,'â','&#226;');
-        StringText=strrep(StringText,'ã','&#227;');
-        StringText=strrep(StringText,'ä','&#228;');
-        StringText=strrep(StringText,'å','&#229;');
-        StringText=strrep(StringText,'æ','&#230;');
-        StringText=strrep(StringText,'ç','&#231;');
-        StringText=strrep(StringText,'è','&#232;');
-        StringText=strrep(StringText,'é','&#233;');
-        StringText=strrep(StringText,'ê','&#234;');
-        StringText=strrep(StringText,'ë','&#235;');
-        StringText=strrep(StringText,'ì','&#236;');
-        StringText=strrep(StringText,'í','&#237;');
-        StringText=strrep(StringText,'î','&#238;');
-        StringText=strrep(StringText,'ï','&#239;');
-        StringText=strrep(StringText,'ð','&#240;');
-        StringText=strrep(StringText,'ñ','&#241;');
-        StringText=strrep(StringText,'ò','&#242;');
-        StringText=strrep(StringText,'ó','&#243;');
-        StringText=strrep(StringText,'ô','&#244;');
-        StringText=strrep(StringText,'õ','&#245;');
-        StringText=strrep(StringText,'ö','&#246;');
-        StringText=strrep(StringText,'÷','&#247;');
-        StringText=strrep(StringText,'ø','&#248;');
-        StringText=strrep(StringText,'ù','&#249;');
-        StringText=strrep(StringText,'ú','&#250;');
-        StringText=strrep(StringText,'û','&#251;');
-        StringText=strrep(StringText,'ü','&#252;');
-        StringText=strrep(StringText,'ý','&#253;');
-        StringText=strrep(StringText,'þ','&#254;');
-        StringText=strrep(StringText,'ÿ','&#255;');
+        StringText=strrep(StringText,'','&#191;');
+        StringText=strrep(StringText,'','&#192;');
+        StringText=strrep(StringText,'','&#193;');
+        StringText=strrep(StringText,'','&#194;');
+        StringText=strrep(StringText,'','&#195;');
+        StringText=strrep(StringText,'','&#196;');
+        StringText=strrep(StringText,'','&#197;');
+        StringText=strrep(StringText,'','&#198;');
+        StringText=strrep(StringText,'','&#199;');
+        StringText=strrep(StringText,'','&#200;');
+        StringText=strrep(StringText,'','&#201;');
+        StringText=strrep(StringText,'','&#202;');
+        StringText=strrep(StringText,'','&#203;');
+        StringText=strrep(StringText,'','&#204;');
+        StringText=strrep(StringText,'','&#205;');
+        StringText=strrep(StringText,'','&#206;');
+        StringText=strrep(StringText,'','&#207;');
+        StringText=strrep(StringText,'','&#208;');
+        StringText=strrep(StringText,'','&#209;');
+        StringText=strrep(StringText,'','&#210;');
+        StringText=strrep(StringText,'','&#211;');
+        StringText=strrep(StringText,'','&#212;');
+        StringText=strrep(StringText,'','&#213;');
+        StringText=strrep(StringText,'','&#214;');
+        StringText=strrep(StringText,'','&#215;');
+        StringText=strrep(StringText,'','&#216;');
+        StringText=strrep(StringText,'','&#217;');
+        StringText=strrep(StringText,'','&#218;');
+        StringText=strrep(StringText,'','&#219;');
+        StringText=strrep(StringText,'','&#220;');
+        StringText=strrep(StringText,'','&#221;');
+        StringText=strrep(StringText,'','&#222;');
+        StringText=strrep(StringText,'','&#223;');
+        StringText=strrep(StringText,'','&#224;');
+        StringText=strrep(StringText,'','&#225;');
+        StringText=strrep(StringText,'','&#226;');
+        StringText=strrep(StringText,'','&#227;');
+        StringText=strrep(StringText,'','&#228;');
+        StringText=strrep(StringText,'','&#229;');
+        StringText=strrep(StringText,'','&#230;');
+        StringText=strrep(StringText,'','&#231;');
+        StringText=strrep(StringText,'','&#232;');
+        StringText=strrep(StringText,'','&#233;');
+        StringText=strrep(StringText,'','&#234;');
+        StringText=strrep(StringText,'','&#235;');
+        StringText=strrep(StringText,'','&#236;');
+        StringText=strrep(StringText,'','&#237;');
+        StringText=strrep(StringText,'','&#238;');
+        StringText=strrep(StringText,'','&#239;');
+        StringText=strrep(StringText,'','&#240;');
+        StringText=strrep(StringText,'','&#241;');
+        StringText=strrep(StringText,'','&#242;');
+        StringText=strrep(StringText,'','&#243;');
+        StringText=strrep(StringText,'','&#244;');
+        StringText=strrep(StringText,'','&#245;');
+        StringText=strrep(StringText,'','&#246;');
+        StringText=strrep(StringText,'','&#247;');
+        StringText=strrep(StringText,'','&#248;');
+        StringText=strrep(StringText,'','&#249;');
+        StringText=strrep(StringText,'','&#250;');
+        StringText=strrep(StringText,'','&#251;');
+        StringText=strrep(StringText,'','&#252;');
+        StringText=strrep(StringText,'','&#253;');
+        StringText=strrep(StringText,'','&#254;');
+        StringText=strrep(StringText,'','&#255;');
     end
     StringText=deblank(StringText);
 end
